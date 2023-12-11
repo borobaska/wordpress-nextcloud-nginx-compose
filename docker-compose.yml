@@ -1,0 +1,64 @@
+version: '3'
+
+services:
+  db:
+    container_name: mariadb
+    image: mariadb:10.6
+    restart: unless-stopped
+    command:
+      - --transaction-isolation=READ-COMMITTED
+      - --log-bin=binlog
+      - --binlog-format=ROW
+    volumes:
+      - ./mariadb:/docker-entrypoint-initdb.d
+    environment:
+      MYSQL_ROOT_PASSWORD: sureway__root_pwd
+    expose:
+      - 3306
+
+  nextcloud:
+    container_name: nextcloud
+    image: nextcloud:apache
+    restart: unless-stopped
+    expose:
+      - 80
+    links:
+      - db
+    depends_on:
+      - db
+    environment:
+      MYSQL_HOST: db
+      MYSQL_USER: ${MYSQL_NEXTCLOUD_USER}
+      MYSQL_PASSWORD: ${MYSQL_NEXTCLOUD_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_NEXTCLOUD_DATABASE}
+
+  wordpress:
+    container_name: wordpress
+    image: wordpress:latest
+    restart: unless-stopped
+    expose:
+      - 80
+    links:
+      - db
+    depends_on:
+    - db
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: ${MYSQL_WORDPRESS_USER}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_WORDPRESS_PASSWORD}
+      WORDPRESS_DB_NAME: ${MYSQL_WORDPRESS_DATABASE}
+
+  nginx-proxy-manager:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '81:81'
+      - '443:443'
+    links:
+      - nextcloud
+      - wordpress
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
